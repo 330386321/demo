@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context" xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+       xmlns:jee="http://www.springframework.org/schema/jee" xmlns:tx="http://www.springframework.org/schema/tx"
+       xmlns:util="http://www.springframework.org/schema/util" xmlns:task="http://www.springframework.org/schema/task" xsi:schemaLocation="
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.0.xsd
+		http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc-4.0.xsd
+		http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee-4.0.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
+		http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-4.0.xsd
+		http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.0.xsd"
+     default-lazy-init="true">
+     
+    
+	<!-- 数据源配置, 使用 BoneCP 数据库连接池 -->
+    <bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource" init-method="init" destroy-method="close">
+        <!-- 数据源驱动类可不写，Druid默认会自动根据URL识别DriverClass -->
+        <property name="driverClassName" value="${jdbc.driverClassName}" />
+        <!-- 基本属性 url、user、password -->
+        <property name="url" value="${jdbc.url.info}" />
+        <property name="username" value="${jdbc.username}" />
+        <property name="password" value="${jdbc.password}" />
+
+        <!-- 配置初始化大小、最小、最大 -->
+        <property name="initialSize" value="20" />
+        <property name="minIdle" value="3" />
+        <property name="maxActive" value="50" />
+
+        <!-- 配置获取连接等待超时的时间 -->
+        <property name="maxWait" value="-1" />
+
+        <!-- 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒 -->
+        <property name="timeBetweenEvictionRunsMillis" value="60000" />
+
+        <!-- 配置一个连接在池中最小生存的时间，单位是毫秒 -->
+        <property name="minEvictableIdleTimeMillis" value="30000" />
+
+        <property name="validationQuery" value="SELECT 'x'" />
+        <property name="testWhileIdle" value="true" />
+        <property name="testOnBorrow" value="false" />
+        <property name="testOnReturn" value="false" />
+        <!-- 配置监控统计拦截的filters -->
+        <property name="filters" value="stat" />
+    </bean>
+
+    <!-- 缓存配置 -->
+    <bean id="cacheManager" class="org.springframework.cache.ehcache.EhCacheManagerFactoryBean">
+        <property name="configLocation" value="classpath:${ehcache.configFile}" />
+    </bean>
+     
+    <!-- 定义事务 -->
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource" />
+    </bean>
+
+    <!-- 配置 Annotation 驱动，扫描@Transactional注解的类定义事务  -->
+    <tx:annotation-driven transaction-manager="transactionManager" proxy-target-class="true"/>
+
+    <!-- 配置辅助sql处理工具用于sql查询条件的处理 -->
+    <bean id="sqlToyContext" name="sqlToyContext" class="org.sagacity.sqltoy.SqlToyContext"
+          init-method="initialize">
+
+        <!-- 指定sql.xml 文件的路径实现目录的递归查找,非必须属性 -->
+        <property name="sqlResourcesDir" value="classpath:sqltoy/" />
+        <!-- 针对不同数据库函数进行转换,非必须属性 -->
+        <property name="functionConverts">
+            <list>
+                <value>org.sagacity.sqltoy.config.function.impl.SubStr</value>
+                <value>org.sagacity.sqltoy.config.function.impl.Trim</value>
+                <value>org.sagacity.sqltoy.config.function.impl.Instr</value>
+                <value>org.sagacity.sqltoy.config.function.impl.Concat</value>
+                <value>org.sagacity.sqltoy.config.function.impl.Nvl</value>
+            </list>
+        </property>
+        <!-- pojo 包路径,非必须属性 -->
+        <property name="packagesToScan">
+            <list>
+                <value>com.sinochem</value>
+            </list>
+        </property>
+        <!-- 缓存翻译管理器,非必须属性 -->
+        <property name="translateConfig" value="classpath:sqltoy-translate.xml" />
+        <property name="cacheManager" ref="cacheManager" />
+        <!-- 默认值为:false -->
+        <property name="debug" value="${sqltoy.debug}" />
+        <!-- 默认值为:50,提供sqltoy批量更新的batch量 -->
+        <property name="batchSize" value="${sqltoy.batchSize}" />
+
+        <!-- 如果是单一类型的数据库，建议dialect一定要设置,可避免不必要的数据库类型判断 -->
+        <property name="dialect" value="${sqltoy.dialect}" />
+
+        <!-- 默认值为:100000,设置分页查询最大的提取数据记录量,防止恶意提取数据造成系统内存压力以及保障数据安全 -->
+        <property name="page_fetch_size_limit" value="50000" />
+    </bean>
+
+
+    <bean id="sqlToyLazyDao" name="sqlToyLazyDao"
+          class="org.sagacity.sqltoy.dao.impl.SqlToyLazyDaoImpl" />
+
+    <bean id="sqlToyCRUDService" name="sqlToyCRUDService"
+          class="org.sagacity.sqltoy.service.impl.SqlToyCRUDServiceImpl" >
+        <property name="sqlToyLazyDao" ref="sqlToyLazyDao"/>
+    </bean>
+
+</beans>
